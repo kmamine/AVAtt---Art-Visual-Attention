@@ -1,7 +1,12 @@
 # AVAtt---Art-Visual-Attention
 A visual attention dataset for art and paintings, providing scanpaths, and aggregated saliency maps. 
-
 We present a new art and paintings dataset for visual attention
+
+---
+**NOTE**
+
+The dataset will be available after publication.
+---
 
 
 ![Figure 1](imgs/fig1.png)
