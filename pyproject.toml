@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "avatt"
+version = "2.0.0"
+description = "AVAtt: a free-viewing eye-tracking dataset and benchmark for visual attention on paintings"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Mohamed Amine Kerkouri", email = "m.a.kerkouri@f-initiatives.com" }]
+requires-python = ">=3.10"
+keywords = ["eye tracking", "saliency", "scanpaths", "visual attention", "paintings", "art", "dataset"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Image Recognition",
+    "Intended Audience :: Science/Research",
+]
+dependencies = [
+    "numpy>=1.24",
+    "pandas>=2.0",
+    "scipy>=1.10",
+    "pillow>=10.0",
+    "huggingface_hub>=0.23",
+]
+
+[project.optional-dependencies]
+# full analysis pipeline (see README: Reproducing the paper); eyefeatures requires Python 3.10-3.12 and numpy 1.26
+analysis = [
+    "numpy==1.26.0",
+    "opencv-python>=4.9",
+    "matplotlib>=3.8",
+    "scikit-learn>=1.4",
+    "scikit-image>=0.22",
+    "torch>=2.4",
+    "torchvision>=0.19",
+    "timm>=1.0",
+    "transformers>=4.45",
+    "open_clip_torch>=2.26",
+    "ultralytics>=8.4",
+    "einops",
+    "tensorboardX",
+    "fdiss>=0.1",
+    "eyefeatures>=2.0",
+    "gdown",
+    "tqdm",
+]
+dev = ["pytest>=8", "ruff>=0.5"]
+
+[project.urls]
+Dataset = "https://huggingface.co/datasets/Amine-CV/AVAtt"
+Repository = "https://github.com/kmamine/AVAtt---Art-Visual-Attention"
+
+[tool.setuptools]
+packages = ["avatt"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

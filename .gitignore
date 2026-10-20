@@ -1,0 +1,31 @@
+# data and generated outputs
+data/
+results/
+third_party/
+paper/figures/
+paper/generated/
+paper/*.pdf
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+*.npz
+*.pt
+*.pth
+*.ts
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+.venv/
+
+# editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

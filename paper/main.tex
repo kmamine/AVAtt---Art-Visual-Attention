@@ -1,0 +1,713 @@
+% AVAtt preprint -- CVPR 2026 author kit (https://github.com/cvpr-org/author-kit), arXiv mode
+\documentclass[10pt,twocolumn,letterpaper]{article}
+\usepackage[pagenumbers]{cvpr}
+
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{cuted}
+\usepackage{microtype}
+
+\definecolor{cvprblue}{rgb}{0.21,0.49,0.74}
+\usepackage[pagebackref,breaklinks,colorlinks,allcolors=cvprblue]{hyperref}
+\usepackage[capitalize]{cleveref}
+
+\graphicspath{{figures/}}
+\input{generated/macros}
+\makeatletter\newcommand{\inputtab}[1]{\@@input #1 }\makeatother
+\newcommand{\avatt}{AVAtt}
+\newcommand{\dg}{\ensuremath{^\circ}}
+\newcommand{\mypara}[1]{\vspace{2pt}\noindent\textbf{#1}\hspace{0.5em}}
+
+\def\confName{CVPR}
+\def\confYear{2026}
+
+\title{\avatt: A Free-Viewing Eye-Tracking Dataset and Benchmark for Visual Attention on Paintings}
+
+\author{Mohamed Amine Kerkouri\textsuperscript{1,}\thanks{Work done while at the University of Orl\'eans, PRISME
+Laboratory. This paper extends our ETRA 2024 late-breaking work~\cite{kerkouri2024avatt}.}\qquad Marouane Tliba\textsuperscript{2}\qquad
+Aladine Chetouani\textsuperscript{2}\qquad Alessandro Bruno\textsuperscript{3}\\[4pt]
+\textsuperscript{1}F-Initiatives, France\qquad
+\textsuperscript{2}University of Orl\'eans, PRISME Laboratory, France\\
+\textsuperscript{3}IULM University, Milan, Italy\\
+{\tt\small m.a.kerkouri@f-initiatives.com}}
+
+\begin{document}
+
+\twocolumn[{%
+\renewcommand\twocolumn[1][]{#1}%
+\maketitle
+\begin{center}
+  \centering
+  \includegraphics[width=0.97\textwidth]{examples.png}
+  \captionof{figure}{\textbf{\avatt{} examples.} Top: saliency maps (one degree of visual angle) over the paintings.
+  Bottom: three individual scanpaths (first 5\,s). \avatt{} provides individual scanpaths with timing and viewing
+  distance, fixation and saliency maps, and temporal saliency videos for \nImages{} public-domain paintings from
+  sixteen art movements.}
+  \label{fig:teaser}
+\end{center}
+\vspace{6pt}
+}]
+
+% =====================================================================
+\begin{abstract}
+Saliency and scanpath models are developed almost exclusively on natural photographs, yet paintings are composed by
+artists to guide the viewer's eye and differ from photographs in texture, colour and abstraction. We introduce
+\avatt, a free-viewing eye-tracking dataset on \nImages{} public-domain paintings spanning sixteen art movements, with
+\nScanpaths{} scanpaths and \nFixations{} fixations from \nParticipants{} participants (\spPerImageMin--\spPerImageMax{}
+observers per painting). For every painting we release individual scanpaths with fixation timing and eye--screen
+distance, fixation maps, saliency maps smoothed at one degree of visual angle, and temporal saliency videos. We
+benchmark classic and deep saliency models against human split-half agreement, and test 44 scanpath-similarity
+measures, including an image-encoder adaptation of language-model-based metrics built on ten CNN, ViT and
+self-supervised encoders. With controls that remove viewing biases, we show that local structure, faces and people
+draw attention in paintings, that faces are fixated \faceEnrich$\times$ more than expected and within half a second,
+and that composition rules fitted from image content predict where people look, although no individual painting
+follows a rule beyond chance. The dataset and code are publicly available.
+\end{abstract}
+
+% =====================================================================
+\section{Introduction}
+\label{sec:intro}
+
+Visual attention models are trained and evaluated on photographs of natural
+scenes~\cite{judd2009mit,jiang2015salicon,borji2015cat2000}. Paintings challenge these models in several ways.
+Their textures, palettes and degrees of abstraction differ from photographs, they span centuries of pictorial
+conventions, and their content is \emph{composed}: artists place subjects, lines and contrasts deliberately to
+organise how a picture is read. Eye tracking has been used to study the viewing of art since Yarbus'
+recordings~\cite{yarbus1967,nodine1993art,quiroga2011art,massaro2012art}, but public data remain scarce. The
+largest public collection provides aggregated saliency maps for 150 paintings in five styles, without individual
+scanpaths~\cite{lemeur2020paintings}. Two factors explain the gap: recording enough observers per image is costly, and
+copyright restricts the redistribution of artworks.
+
+We present \avatt, a free-viewing eye-tracking dataset on public-domain paintings (\cref{fig:teaser}), first
+introduced as a late-breaking result~\cite{kerkouri2024avatt}, together with a set of benchmarks and analyses. Our
+contributions are:
+\begin{itemize}
+  \item \textbf{Dataset.} \nScanpaths{} scanpaths on \nImages{} paintings from sixteen movements, with fixation timing,
+  per-fixation viewing distance, fixation and saliency maps derived from the measured viewing geometry, and temporal
+  saliency videos (\cref{sec:dataset}).
+  \item \textbf{Saliency benchmark.} Classic and deep models are evaluated on the painting area against human
+  split-half agreement and centre-bias baselines (\cref{sec:saliency}).
+  \item \textbf{Scanpath-similarity benchmark.} 44 measures are compared under a test that separates shared viewing
+  from chance. It includes FDISS~\cite{kerkouri2026fdiss}, standard distances and an image-encoder version of
+  language-model-based scanpath metrics using ten encoders (\cref{sec:scanpath}).
+  \item \textbf{What draws attention in paintings.} Image features, faces and objects, and composition are tested
+  against a baseline that cancels central and scanning biases (\cref{sec:content}).
+\end{itemize}
+
+% =====================================================================
+\section{Related Work}
+\label{sec:related}
+
+\mypara{Eye-tracking datasets.} Free-viewing datasets such as MIT1003~\cite{judd2009mit},
+CAT2000~\cite{borji2015cat2000} and the mouse-based SALICON~\cite{jiang2015salicon} drive saliency research
+(\cref{tab:compare}). CAT2000 includes an art category among its twenty. \citet{lemeur2020paintings} collected
+fixations on 150 paintings and showed that saliency models transfer imperfectly to art. Most other studies of viewing
+art use small purpose-built stimulus sets and do not release data~\cite{nodine1993art,quiroga2011art,massaro2012art}.
+
+\mypara{Saliency models.} Bottom-up models compute centre--surround contrast~\cite{itti1998model}, graph-based
+activation~\cite{harel2006gbvs} or spectral residuals~\cite{hou2007spectral}. Deep models such as
+UNISAL~\cite{droste2020unisal}, TranSalNet~\cite{lou2022transalnet} and DeepGaze IIE~\cite{linardos2021deepgaze} lead
+on natural images. Maps are scored with location- and distribution-based metrics~\cite{bylinskii2019metrics}.
+
+\mypara{Scanpath similarity.} Scanpaths are compared with string-edit methods (ScanMatch~\cite{cristino2010scanmatch}),
+geometric distances (DTW, Fr\'echet, Hausdorff, Mannan~\cite{mannan1995}), the five-dimensional
+MultiMatch~\cite{dewhurst2012multimatch}, and FDISS~\cite{kerkouri2026fdiss}, which models fixations as foveal discs;
+see~\cite{lemeur2013methods} for a review. Language-model-based metrics~\cite{scanpathnlp} describe fixated regions with
+a vision--language model and compare the descriptions with text metrics such as BERTScore~\cite{zhang2020bertscore}.
+
+\mypara{Composition.} Compositional devices such as the rule of thirds, golden sections and spirals, diagonals, and
+Hambidge's dynamic symmetry~\cite{hambidge1926} are meant to organise attention. Photographic composition can be
+classified automatically~\cite{lee2018kupcp,hong2021cacnet}, but the link between detected composition and gaze on
+paintings has not been tested at scale.
+
+\begin{table}[t]
+  \centering
+  \caption{Comparison with public free-viewing datasets.}
+  \label{tab:compare}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{llrcccc}
+    \toprule
+    Dataset & Domain & Images & Tracking & Scanpaths & Sal.\ maps & Temporal \\
+    \midrule
+    \inputtab{generated/tab_compare.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+% =====================================================================
+\section{The \avatt{} Dataset}
+\label{sec:dataset}
+
+\mypara{Stimuli.} We collected 340 paintings from WikiArt~\cite{saleh2015wikiart}, Wikimedia Commons and other
+public-domain sources, covering sixteen movement groups: abstract art, Baroque, Chinese ink, Classicism, Cubism, Early
+and High Renaissance, Expressionism, Impressionism, Luminism, Neo-Impressionism, Realism, Romanticism, Surrealism,
+Tonalism and Ukiyo-e, from the 15th to the 21st century and by \nArtists{} identified artists
+(\cref{fig:movements}). Each painting is annotated with artist, title, year, movement, genre and medium, with a
+confidence level (\nMetaHigh{} works identified, \nMetaMedium{} attributed by artist, \nMetaLow{} annotated by movement
+and genre only). Following~\cite{lemeur2020paintings}, each painting was resized without distortion and centred on a
+1600$\times$900 grey canvas, which it covers by \paintingAreaPct\% on average. All image analyses in this paper are
+restricted to the painting itself.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{movements.png}
+  \caption{Paintings per movement group (left) and agreement between observers by movement (right).}
+  \label{fig:movements}
+\end{figure}
+
+\mypara{Participants.} \nParticipants{} volunteers took part (\cref{tab:participants}): students, researchers and
+staff, recruited by convenience sampling. Participants gave informed consent; the procedure followed the Declaration of
+Helsinki~\cite{helsinki2013} and the EU GDPR, and the released data contain no personal information. All reported
+normal or corrected-to-normal vision, and colour vision was screened with three Ishihara plates~\cite{ishihara1967}.
+
+\begin{table}[t]
+  \centering
+  \caption{Participants (questionnaire data).}
+  \label{tab:participants}
+  \small
+  \begin{tabular}{ll}
+    \toprule
+    Participants & \nParticipants \\
+    Age (years) & \ageMean{} $\pm$ \ageSD{} (median \ageMedian, range \ageMin--\ageMax) \\
+    Gender & \nMale{} men (\pctMale\%), \nFemale{} women (\pctFemale\%) \\
+    Art expertise & \pctNovice\% novice, \nAmateur{} amateur, \nExpert{} expert \\
+    Origin & \nCountries{} countries; France \pctFrance\% \\
+    Vision & normal or corrected; Ishihara screening \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\mypara{Apparatus and protocol.} Gaze was recorded with a Tobii X2-30 eye tracker (30\,Hz) after 9-point calibration,
+on a 1920$\times$1080 display in rooms with constant lighting. Participants were instructed to ``freely view and enjoy
+the paintings''. Each painting was shown for 5.5\,s or 15\,s depending on the session, and was followed by a grey
+screen of 1.5--2\,s. Fixations were extracted with the Tobii fixation filter (I-VT).
+
+\mypara{Viewing geometry.} Rather than nominal values, we derive the geometry from the recordings. Regressing Tobii's
+pixel gaze coordinates on its millimetre coordinates gives \pxPerMM\,px/mm (a \screenWidthMM\,mm-wide display). The
+eye--screen distance recorded for each fixation averaged \distMean{} $\pm$ \distSD\,cm. One degree of visual angle
+therefore spans $2d\tan(0.5\dg)\cdot\text{px/mm} = \pxPerDeg$\,px, which we use for all maps and regions.
+
+\mypara{Processing and quality control.} Recordings were split by stimulus, and the grey inter-stimulus screens and
+repeated viewings were discarded. Onsets are relative to the first fixation on the painting. A scanpath is kept if it
+spans at least 4.5\,s, and a painting if at least ten valid scanpaths remain; ten observers suffice for stable maps
+(\cref{sec:behaviour}). The released set has \nImages{} paintings, \nScanpaths{} scanpaths and \nFixations{} fixations,
+with a median of \spPerImageMedian{} observers per painting.
+
+\mypara{Released data.} For each painting the release contains its metadata and:
+(i) individual scanpaths as JSON lines, with per-fixation position, onset, duration and eye--screen distance;
+(ii) a binary fixation map;
+(iii) a saliency map, the fixation map convolved with a Gaussian of $\sigma=1\dg$; and
+(iv) a temporal saliency video (60\,fps, 5\,s) in which every fixation contributes the time already spent on it,
+$\min(\max(t-t_{\text{on}},0),\,d)$, so that each frame shows all attention accumulated up to time~$t$
+(\cref{fig:temporalframes}).
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{temporal_frames.png}
+  \caption{Frames of a temporal saliency video: attention accumulated up to $t$.}
+  \label{fig:temporalframes}
+\end{figure}
+
+% =====================================================================
+\section{Viewing Behaviour on Paintings}
+\label{sec:behaviour}
+
+\mypara{Eye movements.} Scanpaths contain \fixPerSp{} fixations on average (\cref{fig:stats}). Fixation durations have
+a median of \fixDurMedian\,ms (mean \fixDurMean{} $\pm$ \fixDurSD). Saccade amplitudes, computed with each fixation's
+viewing distance, have a median of \saccAmpMedian\dg{} (mean \saccAmpMean{} $\pm$ \saccAmpSD). \pctHorizontal\% of
+saccades lie within $\pm$30\dg{} of horizontal, against 33\% for uniform directions, and \pctCentralHalf\% of fixations
+fall in the central half of the canvas, the usual central tendency~\cite{tatler2007central}.
+
+\begin{figure*}[t]
+  \centering
+  \includegraphics[width=\textwidth]{eye_movement_stats.png}
+  \caption{Fixation duration, saccade amplitude, eye--screen distance per fixation (shaded: 50--65\,cm) and observers
+  per painting.}
+  \label{fig:stats}
+\end{figure*}
+
+\mypara{Temporal dynamics.} Over the first five seconds, which every painting shares, viewing follows the
+ambient-to-focal progression~\cite{pannasch2008ambient}: fixations lengthen and saccades shorten
+(\cref{fig:temporal}). Agreement between observers, measured as the leave-one-out NSS in 1-s windows, falls from
+\nssFirstSec{} in the first second to \nssLastSec{} in the fifth. The cumulative saliency map reaches a correlation of
+0.9 with the 5-s map after \ccNine\,s.
+
+\begin{figure*}[t]
+  \centering
+  \begin{subfigure}{0.49\textwidth}\includegraphics[width=\linewidth]{temporal_dur_amp.png}\end{subfigure}\hfill
+  \begin{subfigure}{0.245\textwidth}\includegraphics[width=\linewidth]{temporal_agreement.png}\end{subfigure}\hfill
+  \begin{subfigure}{0.245\textwidth}\includegraphics[width=\linewidth]{temporal_convergence.png}\end{subfigure}
+  \caption{Temporal dynamics over the first 5\,s (mean $\pm$ 95\% CI): fixation duration and saccade amplitude,
+  inter-observer agreement, and convergence of the cumulative saliency map.}
+  \label{fig:temporal}
+\end{figure*}
+
+\mypara{Inter-observer agreement.} Inter-observer congruency, the share of an observer's fixations
+inside the Otsu-thresholded~\cite{otsu1979} map of the others, is \iocMean{} $\pm$ \iocSD. On the \convImages{} paintings with at least
+fourteen observers, maps built from $k$ observers approach a held-out group of five quickly: AUC reaches 95\% of its
+nine-observer value with \kNinetyFiveAUC{} observers, and CC and NSS with \kNinetyFiveCC{} (supp.\ \cref{fig:supp-convergence}).
+
+% =====================================================================
+\section{Benchmarks}
+\label{sec:benchmarks}
+
+\subsection{Saliency prediction}
+\label{sec:saliency}
+
+\mypara{Protocol.} Every predictor receives the painting crop and is evaluated on the painting area, using only
+fixations on the painting. For each painting, observers are split ten times into random halves, and every predictor is
+scored against the same held-out half with AUC-Judd, shuffled AUC (negatives: fixations from other paintings in
+painting coordinates), NSS, CC, SIM and KL~\cite{bylinskii2019metrics}. We evaluate the map of the other half
+(\emph{human} ceiling), a single observer, three deep models with their released weights
+(DeepGaze IIE~\cite{linardos2021deepgaze} with its MIT1003 centre bias, TranSalNet-Res~\cite{lou2022transalnet},
+UNISAL~\cite{droste2020unisal}), three classic models (GBVS~\cite{harel2006gbvs} and Itti--Koch~\cite{itti1998model}
+from a PyTorch port of the GBVS toolbox~\cite{gbvstorch}, and the spectral residual~\cite{hou2007spectral}), the
+salient-object map of BiRefNet~\cite{zheng2024birefnet}, and two centre biases: the fixations of all other paintings
+in painting coordinates, and a Gaussian.
+
+\mypara{Results.} \Cref{tab:benchmark} shows a clear gap between models and humans. The best model by NSS,
+\bestModel{} (NSS \bestModelNSS, CC \bestModelCC), remains below the human split-half agreement (CC \humanCC, NSS
+\humanNSS). The dataset centre bias alone reaches AUC \centreAUC. Salient-object segmentation is a poor saliency
+predictor on its own: objects are fixated, but not uniformly over their surface.
+
+\begin{table}[t]
+  \centering
+  \caption{Saliency benchmark on the paintings (mean over paintings, split-half). Bold: best non-human predictor.}
+  \label{tab:benchmark}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lcccccc}
+    \toprule
+    Predictor & AUC-J & sAUC & NSS & CC & SIM & KL$\downarrow$ \\
+    \midrule
+    \inputtab{generated/tab_benchmark.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\subsection{Scanpath similarity}
+\label{sec:scanpath}
+
+\mypara{Test design.} A good similarity measure should rate two observers of the same painting as more similar than
+unrelated scanpaths. For each painting we sample up to 45 \emph{intra-image} pairs (\nIntraPairs{} in total). For each
+pair we build an \emph{inter-image} baseline: the first observer against the scanpath of an observer of another
+painting shown for the same duration, mapped onto the current painting by its relative position in the painting. The
+baseline has realistic scanpath statistics and lies on the same painting, so content-based measures cannot exploit
+differences between paintings. Scanpaths are cut to 5\,s. We report the pair-level AUC of intra versus inter pairs and
+a paired Wilcoxon test over paintings, with the rank-biserial effect size and Benjamini--Hochberg
+correction~\cite{benjamini1995fdr}.
+
+\mypara{Spatial measures.} We test FDISS~\cite{kerkouri2026fdiss} (1\dg{} discs) and the eyefeatures~\cite{eyefeatures}
+implementations of MultiMatch, DTW, discrete Fr\'echet, Hausdorff, Euclidean, Mannan, EyeAnalysis, time-delay embedding
+and ScanMatch.
+
+\mypara{Image-encoder measures.} Language-model-based metrics~\cite{scanpathnlp} describe each fixated 96-px patch with
+a vision--language model and compare paragraph descriptions with text metrics, at the cost of thousands of generative
+calls per painting. We keep the idea of comparing \emph{what} was fixated, but replace the text with image embeddings.
+Each painting is encoded once. A fixation is the mean of the dense feature map over its 96-px window ($\approx$2.7\dg),
+L2-normalised. Sequences are compared by \emph{patch-BERTScore} (greedy cosine matching, F1 of precision and recall, as
+in BERTScore~\cite{zhang2020bertscore}), \emph{embedding DTW} (order-aware), and mean-pooled cosine. We compare
+supervised CNNs (VGG-16~\cite{simonyan2015vgg}, ResNet-50~\cite{he2016resnet}, ConvNeXt-T~\cite{liu2022convnext}),
+the original ViT-B/16~\cite{dosovitskiy2021vit}, CLIP~\cite{radford2021clip}, and self-supervised MAE~\cite{he2022mae},
+DINOv2~\cite{oquab2024dinov2}, DINOv3~\cite{simeoni2025dinov3}, I-JEPA~\cite{assran2023ijepa} and
+VICReg~\cite{bardes2022vicreg}.
+
+\mypara{Results.} Every measure except MultiMatch duration ($q=\mmDurationQ$) separates the pairs ($q<10^{-3}$;
+\cref{tab:scanpath,tab:encoders}). FDISS is the most discriminative (AUC \fdissAUC; intra pairs are more similar in
+\fdissPct\% of paintings), followed by the best encoder measure, \bestEncoderLabel{} (\bestEncoderAUC). Greedy
+matching beats order-aware DTW and mean pooling for every encoder: \emph{what} viewers look at carries more of the
+shared signal than \emph{the order} in which they look. MultiMatch's shape, direction and length dimensions, which
+ignore position, separate the pairs only weakly.
+
+\begin{table}[t]
+  \centering
+  \caption{Spatial scanpath measures, intra vs inter pairs. $r_{rb}$: rank-biserial effect size; \% img.: paintings where
+  intra pairs are more similar; $q$: BH-corrected.}
+  \label{tab:scanpath}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lcrrcccc}
+    \toprule
+    Measure & & Intra & Inter & AUC & $r_{rb}$ & \% img. & $q$ \\
+    \midrule
+    \inputtab{generated/tab_scanpath_spatial.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{Image-encoder scanpath measures: AUC of intra vs inter pairs (all $q<10^{-3}$). Bold: best per column.}
+  \label{tab:encoders}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{llccc}
+    \toprule
+    Encoder & Training & BERTScore & DTW & Mean-pool \\
+    \midrule
+    \inputtab{generated/tab_scanpath_encoders.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+% =====================================================================
+\section{What Draws Attention in Paintings}
+\label{sec:content}
+
+\mypara{A bias-free baseline.} Fixations concentrate in the centre and follow habitual scanning patterns, so comparing
+fixated with random locations confounds content with viewing habits. We instead compare observed fixations with an
+\emph{other-paintings baseline}: whole scanpaths recorded on other paintings, mapped into the current painting by
+relative position. Content attracts attention if it receives more fixations than this baseline predicts. All image
+analyses run on the painting crop and never use gaze. We segment salient objects with BiRefNet~\cite{zheng2024birefnet};
+detect people, animals and objects with YOLO26 instance segmentation and YOLOE-26 open-vocabulary
+segmentation~\cite{ultralytics,wang2025yoloe}; detect faces from pose keypoints and YOLOE-26; and estimate sky with
+ADE20K semantic segmentation and relative depth with YOLO26. This yields \nFaces{} faces in \nPaintingsFaces{}
+paintings and up to three focal subjects per painting.
+
+\mypara{Image features.} We compare feature values at observed and baseline fixations (AUC; \cref{fig:features}).
+Local structure attracts the eye most: edge density (\aucEdges), local spatial information (\aucSI), RMS contrast
+(\aucContrast) and colourfulness (\aucColour). Nearness (\aucNear), saturation (\aucSat) and salient-object probability
+(\aucSOD) have smaller positive effects, and bright regions are slightly avoided (\aucLum). Distance from the painting
+centre has no effect (\aucCentre), which confirms that the baseline absorbs the central tendency.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{feature_auc.png}
+  \caption{Image features at fixated vs baseline locations (AUC; * $q<0.05$).}
+  \label{fig:features}
+\end{figure}
+
+\mypara{Faces and objects.} Faces are the strongest attractor (\cref{tab:objects}). They cover \faceAreaPct\% of the
+paintings that contain them but receive \faceObsPct\% of fixations, against \faceBasePct\% under the baseline. The median
+first fixation on a face occurs at \faceLatency\,s (baseline \faceLatencyBase\,s), and \faceReachOne\% of viewers fixate
+a face within one second (baseline \faceReachOneBase\%), as reported for photographs~\cite{cerf2008faces}. People,
+vessels, animals and food are also over-fixated, whereas sky is under-fixated.
+
+\begin{table}[t]
+  \centering
+  \caption{Attention to object categories. Enrich.: observed / baseline share of fixations; @1s: \% of viewers reaching
+  the category within 1\,s, observed / baseline.}
+  \label{tab:objects}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lrrrrrrr}
+    \toprule
+    Category & Paint. & Area\% & Fix.\% & Base\% & Enrich. & @1s & $q$ \\
+    \midrule
+    \inputtab{generated/tab_objects.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\mypara{Composition.} We consider eight families of templates, defined in painting coordinates
+(supp.\ \cref{fig:supp-templates}): the rule of thirds, the golden grid, the centre, the diagonals, golden triangles,
+Hambidge's dynamic symmetry~\cite{hambidge1926}, and the golden spiral. The spiral has eight variants (four corners,
+two orientations), either stretched to the canvas or as a true golden rectangle. Each variant is fitted to a painting
+from image content only, combining the proximity of focal subjects to its key points with salient-object-weighted edge
+strength along its lines. Because picking the best of several variants always yields some fit, we correct for this
+selection: every other painting's content is scored on the same templates and serves as the null, and the best-variant
+statistic is compared against the null's best-variant statistics.
+
+Under this test, only 13--15 of \nImages{} paintings reach $p<0.05$ for any family, which is what chance predicts,
+and none survives correction (\cref{tab:composition}). Shared conventions such as subjects near the centre or the thirds
+are part of the null, so no painting follows a rule \emph{more} than paintings in general do. Automatic classifiers are
+also unreliable on paintings: CACNet~\cite{hong2021cacnet}, trained on photographs~\cite{lee2018kupcp}, and CLIP
+zero-shot agree on the top class for only \cacClipAgree\% of paintings.
+
+Treated as a graded score, however, the fit predicts gaze. Paintings that fit a family better receive more fixations on
+its points and lines relative to the baseline, for every family (Spearman $\rho=0.12$--$0.29$; \cref{tab:composition}).
+The selected spiral variant attracts more fixations than the other seven ($p<10^{-3}$), and the eye of the best true-ratio
+spiral is reached \spiralEyeGain\,s earlier than the baseline predicts ($p=\spiralEyeP$). Saccades also align slightly
+with the painting's dominant lines ($p=\lineFollowP$). Since the fit is computed from salient content, composition
+appears to steer attention by placing salient content on its points and lines, rather than through the geometry alone.
+
+\begin{table}[t]
+  \centering
+  \caption{Composition families. Var.: variants; $p{<}.05$ / $q{<}.10$: paintings following the family under the
+  selection-corrected test; Enrich.: fixation enrichment on the template for the best / worst-fitting quarter; $\rho$:
+  correlation between fit and enrichment.}
+  \label{tab:composition}
+  \resizebox{\columnwidth}{!}{%
+  \begin{tabular}{lrrrcccr}
+    \toprule
+    Family & Var. & $p{<}.05$ & $q{<}.10$ & Top & Bottom & $\rho$ & $p_\rho$ \\
+    \midrule
+    \inputtab{generated/tab_composition.tex}
+    \bottomrule
+  \end{tabular}}
+\end{table}
+
+\mypara{Painting-level factors.} Across paintings (supp.\ \cref{fig:supp-factors}), faces focus attention: more faces
+mean lower saliency-map entropy ($\rho=\rhoFacesEntropy$) and longer fixations ($\rho=\rhoFacesDur$). Horizons spread
+attention ($\rho=\rhoHorizonEntropy$), and diagonal lines increase agreement between observers ($\rho=\rhoDiagCC$).
+Wide paintings produce more dispersed fixations ($\rho=\rhoAspectDisp$), a largely geometric effect. Colourfulness and
+symmetry show no association.
+
+\subsection{Style, composition and content}
+\label{sec:style}
+
+\mypara{Style shapes viewing.} We compare the fifteen movement groups with at least five paintings, measuring viewing
+over the first 5\,s only and adjusting for exposure duration. Agreement between observers, saliency-map entropy,
+dispersion, fixation duration and saccade amplitude all differ across styles (Kruskal--Wallis $p=\kwStyleAgrP$ for
+agreement, $p=\kwStyleEntP$ for entropy; supp.\ \cref{fig:supp-style-attention}), whereas the share of central
+fixations does not ($p=\kwStyleCenP$). Chinese ink, Realism, Romanticism and Early Renaissance paintings produce the
+most consistent viewing; High Renaissance, Impressionist and Expressionist paintings the least.
+
+\mypara{Composition and content differ by style.} Styles favour different compositions
+(supp.\ \cref{fig:supp-style-composition}): image-only fit scores differ across styles for the centre, golden-grid and
+spiral templates (BH $q<0.05$), centred compositions dominate Cubist and Expressionist works, and the CACNet class
+distribution depends on style ($\chi^2$ $p=\cacStyleP$). Content differs too (supp.\ \cref{fig:supp-style-objects}):
+faces appear in every Early Renaissance painting but in few Impressionist ones, and animals and vessels concentrate in
+Baroque works. Where faces are present they are over-fixated in every style (3--10$\times$), with no reliable
+difference between styles ($p=\faceStyleP$). The link between composition fit and fixations holds within most styles,
+so it does not merely reflect differences between styles.
+
+\mypara{Which factor matters most?} To separate the factors, we predict each viewing measure from five blocks of
+painting descriptors: \emph{style} (movement group), \emph{composition} (eight template fits and CACNet class
+probabilities), \emph{content} (faces, focal subjects, salient-object area, horizon and object-category areas),
+\emph{low-level} statistics (colourfulness, spatial information, symmetry, line orientations) and \emph{format} (aspect
+ratio and on-screen size). We use ridge regression with cross-validated $R^2$ (10$\times$5-fold), always including
+exposure duration. A block's \emph{unique} contribution is the $R^2$ lost when it is removed from the full model, and
+is tested by permuting the block (200 permutations). The results (\cref{fig:style-variance}) depend on the measure:
+\begin{itemize}
+  \item \emph{Format} dominates the spatial spread of viewing: dispersion (unique $R^2$ \uFmtDisp), saccade amplitude
+  (\uFmtAmp) and entropy (\uFmtEnt).
+  \item \emph{Content} dominates fixation duration (\uContDur): faces and subjects hold the eye.
+  \item \emph{Style} has the largest unique share of agreement between observers (\uStyAgr, ahead of composition
+  \uCompAgr{} and content \uContAgr).
+  \item \emph{Composition} is the only block that predicts the central tendency (\uCompCen) and adds to entropy
+  (\uCompEnt) beyond everything else.
+\end{itemize}
+Low-level statistics add little once the other blocks are known. In short, \emph{where} the eye travels is set mostly
+by the canvas format and the composition, \emph{how long} it dwells by content, and \emph{how much viewers agree} by
+style.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{style_variance.png}
+  \caption{Variance in viewing explained by style, composition, content, low-level statistics and format
+  (cross-validated $R^2$ beyond exposure duration). Left: each block alone. Right: unique contribution
+  (* permutation $p<0.05$).}
+  \label{fig:style-variance}
+\end{figure}
+
+% =====================================================================
+\section{Limitations and Conclusion}
+\label{sec:conclusion}
+
+The 30\,Hz tracker restricts the data to fixations. Participants form a convenience sample, mostly young and novice in
+art, so expertise effects~\cite{nodine1993art} are out of scope. Exposure differs across sessions, so time-dependent
+analyses use the first five seconds. The object and composition detectors were trained on photographs and are less
+reliable on abstract works. Our encoder-based scanpath measures are a lightweight substitute for, not a replication of,
+language-model-based metrics.
+
+\avatt{} provides individual scanpaths, saliency maps and temporal saliency videos for \nImages{} paintings from sixteen
+movements, together with benchmarks for saliency and scanpath models and an analysis of what guides attention in art.
+Saliency models remain clearly below human agreement on paintings; position-based scanpath measures, FDISS foremost,
+capture shared viewing best; and faces, local structure and composed salient content draw the eye. Data and code are
+available at \url{https://github.com/kmamine/AVAtt---Art-Visual-Attention}.
+
+\mypara{Acknowledgements.} This work was funded by the TIC-ART project of the Centre-Val de Loire Region, France.
+
+{
+  \small
+  \bibliographystyle{ieeenat_fullname}
+  \bibliography{refs}
+}
+
+% =====================================================================
+\clearpage
+\setcounter{page}{1}
+\onecolumn
+\begin{center}
+  {\Large\textbf{\avatt: A Free-Viewing Eye-Tracking Dataset and Benchmark for Visual Attention on Paintings}}\\[6pt]
+  {\large Supplementary Material}
+\end{center}
+\appendix
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+
+\section{Participants and protocol}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{participants.png}
+  \caption{Participants: age, gender, self-reported art expertise and country of origin.}
+\end{figure}
+
+The participants were students, researchers and staff, recruited by convenience sampling, with no compensation. Colour
+vision was screened with three Ishihara plates (12, 72, 42); a few participants showed mild red--green deficiencies,
+without visible effects on their gaze. The eye tracker was positioned below the screen at 50--70\,cm from the
+participant. \distPctRange\% of fixations were made at 50--65\,cm.
+
+\section{Additional dataset statistics}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\textwidth]{image_stats.png}
+  \caption{Colourfulness~\cite{hasler2003colourfulness} and spatial information~\cite{itu2023p910} of the paintings
+  (painting area only). Mean colourfulness \imgColourMean{} $\pm$ \imgColourSD, SI \imgSIMean{} $\pm$ \imgSISD; Pearson
+  $r=\colSIpearson$.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\textwidth]{hsv.png}
+  \caption{Hue, saturation and value at fixated pixels (bars) vs all painting pixels (line).}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \begin{subfigure}{0.32\textwidth}\includegraphics[width=\linewidth]{polar_abs.png}\end{subfigure}
+  \begin{subfigure}{0.32\textwidth}\includegraphics[width=\linewidth]{polar_rel.png}\end{subfigure}
+  \begin{subfigure}{0.34\textwidth}\includegraphics[width=\linewidth]{ioc.png}\end{subfigure}
+  \caption{Saccade direction $\times$ amplitude (absolute and relative) and inter-observer congruency per painting.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.6\textwidth]{central_bias.png}
+  \caption{Fixation density over all paintings ($\sigma=1\dg$), with marginals.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{convergence.png}
+  \caption{Maps from $k$ observers vs five held-out observers (\convImages{} paintings, mean $\pm$ 95\% CI).}
+  \label{fig:supp-convergence}
+\end{figure}
+
+\section{Benchmarks}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{benchmark.png}
+  \caption{Saliency benchmark on the paintings (mean $\pm$ 95\% CI over paintings).}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{sp_spatial.png}
+  \caption{Spatial scanpath measures: intra- vs inter-image pairs.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.75\textwidth]{sp_discrimination.png}
+  \caption{All 44 scanpath measures ranked by AUC (intra vs inter).}
+\end{figure}
+
+\section{Content and composition}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{contact_sheet.png}
+  \caption{Image-only detections: salient objects (cyan), focal subjects (yellow), faces (magenta), horizon (dashed) and
+  best-fitting composition template.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{templates.png}
+  \caption{Composition templates and their variants (aspect ratio 1.45).}
+  \label{fig:supp-templates}
+\end{figure}
+
+\mypara{Fitting details.} The \emph{point fit} of a variant is the salience-weighted mean of
+$\exp(-d^2/2\sigma^2)$ over focal subjects, where $d$ is the distance from the subject's centroid to the nearest key
+point as a fraction of the painting diagonal and $\sigma=0.05$. The \emph{curve fit} is $\log_2$ of the mean of a
+structure map (edge magnitude weighted by salient-object probability, blurred and normalised to mean 1) along the
+template's lines. Each component is turned into a percentile against the other paintings' contents on the same
+template, the two percentiles are averaged, and the best variant is kept. The $p$-value is the share of null paintings
+whose best-variant statistic is at least as high.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\textwidth]{comp_enrichment.png}
+  \caption{Fixation enrichment on composition templates, for the best- and worst-fitting quarter of paintings.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{comp_time.png}
+  \caption{Attention to focal subjects and composition elements over time (left); NSS of the salient-object map over
+  time (right).}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\textwidth]{comp_latency.png}
+  \caption{Time to first fixation, observed minus baseline.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.8\textwidth]{line_following.png}
+  \caption{Saccade alignment with the painting's lines and with the best-fitting golden spiral.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{faces_objects.png}
+  \caption{Attention to faces and object categories.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.7\textwidth]{feature_auc_time.png}
+  \caption{Image-feature effects over viewing time.}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.75\textwidth]{factors.png}
+  \caption{Painting properties vs viewing behaviour (Spearman $\rho$; * $q<0.05$, ** $q<0.01$).}
+  \label{fig:supp-factors}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{comp_class.png}
+  \caption{Viewing by CACNet composition class.}
+\end{figure}
+
+\section{Style analysis}
+
+All viewing measures in this section use the first 5\,s and are adjusted for exposure duration. Movement groups with
+fewer than five paintings are omitted. Feature AUCs (\cref{fig:supp-style-features}) are computed over the full
+viewing, so differences in exposure contribute to them.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{style_attention.png}
+  \caption{Viewing measures by style (number of paintings in parentheses).}
+  \label{fig:supp-style-attention}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{style_composition.png}
+  \caption{Composition by style. Left: mean image-only fit (z-scored; * family differs across styles). Middle: fixation
+  enrichment on the template. Right: within-style correlation between fit and fixation enrichment.}
+  \label{fig:supp-style-composition}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\textwidth]{style_objects.png}
+  \caption{Objects by style: share of paintings containing each category (left) and fixation enrichment over the
+  baseline where present (right).}
+  \label{fig:supp-style-objects}
+\end{figure}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.75\textwidth]{style_features.png}
+  \caption{Image-feature AUC (fixated vs baseline) by style.}
+  \label{fig:supp-style-features}
+\end{figure}
+
+\end{document}
