@@ -35,6 +35,14 @@ def fmt(v, d=2):
     return f"{v:,.{d}f}" if isinstance(v, float) else f"{v:,}"
 
 
+def pval(p):
+    """p-value for use inside math mode, e.g. 6\\times10^{-9}."""
+    if p >= 1e-3:
+        return f"{p:.3f}"
+    m, e = f"{p:.0e}".split("e")
+    return rf"{m}\times10^{{{int(e)}}}"
+
+
 def save(fig, name):
     fig.savefig(os.path.join(FIG, name), dpi=220, bbox_inches="tight")
     plt.close(fig)
@@ -379,21 +387,18 @@ def content():
               "spiral_stretched": "Golden spiral (stretched)", "spiral_true_ratio": "Golden spiral (true ratio)"}
     nvar = {"thirds": 1, "golden_grid": 1, "centre": 1, "diagonal": 2, "golden_triangles": 2, "dynamic_symmetry": 1,
             "spiral_stretched": 8, "spiral_true_ratio": 8}
-    fits = json.load(open(os.path.join(AN, "composition", "fits.json")))
     for x in co["composition_elements"]:
         fam = x["family"]
-        n05 = sum((fits[n][fam].get("p") or 1) < 0.05 for n in fits)
-        nq = sum(fits[n][fam].get("follows", False) for n in fits)
         rho = x["rho_fit_vs_enrichment"]
         prho = "$<10^{-3}$" if x["p_rho"] < 1e-3 else f"{x['p_rho']:.3f}"
-        rows.append(f"{labels[fam]} & {nvar[fam]} & {n05} & {nq} & {2 ** x['follow_mean']:.2f} & {2 ** x['rest_mean']:.2f} & "
+        rows.append(f"{labels[fam]} & {nvar[fam]} & {2 ** x['follow_mean']:.2f} & {2 ** x['rest_mean']:.2f} & "
                     f"{rho:.2f} & {prho} \\\\")
     with open(os.path.join(GEN, "tab_composition.tex"), "w", encoding="utf-8") as fh:
         fh.write("\n".join(rows))
 
     pf = J("results_painting_factors.json")
     M("cacClipAgree", f"{100 * pf['cacnet_clip_top_class_agreement']:.0f}")
-    M("kwEntropyP", f"{pf['kruskal_by_cacnet_class']['entropy']['p']:.1g}")
+    M("kwEntropyP", pval(pf['kruskal_by_cacnet_class']['entropy']['p']))
     sig = {(s["predictor"], s["outcome"]): s for s in pf["significant_q<0.05"]}
     rho = pf["spearman_rho"]
     M("rhoFacesEntropy", f"{rho['entropy']['n_faces']:.2f}")
@@ -495,9 +500,9 @@ def movements():
     res = {}
     for o in ["entropy", "human_CC", "fix_dur_ms"]:
         res[o] = stats.kruskal(*[df.loc[df.movement_group == g, o].dropna() for g in groups]).pvalue
-    M("kwMovEntropyP", f"{res['entropy']:.1g}")
-    M("kwMovCCP", f"{res['human_CC']:.1g}")
-    M("kwMovDurP", f"{res['fix_dur_ms']:.1g}")
+    M("kwMovEntropyP", pval(res['entropy']))
+    M("kwMovCCP", pval(res['human_CC']))
+    M("kwMovDurP", pval(res['fix_dur_ms']))
     order = df.groupby("movement_group").human_CC.median().loc[groups].sort_values().index
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.2), gridspec_kw={"width_ratios": [1, 1.4]})
     c = counts.sort_values()
@@ -526,10 +531,10 @@ def style():
         for b, bk in [("Style", "Sty"), ("Composition", "Comp"), ("Content", "Cont"), ("Low-level", "Low"), ("Format", "Fmt")]:
             M(f"u{bk}{key}", f"{vp[o]['blocks'][b]['unique']:.3f}")
             M(f"a{bk}{key}", f"{vp[o]['blocks'][b]['alone_minus_nuisance']:.2f}")
-    M("kwStyleAgrP", f"{r['attention_kruskal']['agreement_cc']['p']:.1g}")
-    M("kwStyleEntP", f"{r['attention_kruskal']['entropy']['p']:.1g}")
+    M("kwStyleAgrP", pval(r['attention_kruskal']['agreement_cc']['p']))
+    M("kwStyleEntP", pval(r['attention_kruskal']['entropy']['p']))
     M("kwStyleCenP", f"{r['attention_kruskal']['central_pct']['p']:.2f}")
-    M("cacStyleP", f"{r['cacnet_class_by_style']['p']:.1g}")
+    M("cacStyleP", pval(r['cacnet_class_by_style']['p']))
     M("faceStyleP", f"{r.get('face_enrichment_kruskal_p', float('nan')):.2f}")
     for src, dst in [("34_attention_by_style.png", "style_attention.png"), ("35_composition_by_style.png", "style_composition.png"),
                      ("36_objects_by_style.png", "style_objects.png"), ("37_features_by_style.png", "style_features.png"),
