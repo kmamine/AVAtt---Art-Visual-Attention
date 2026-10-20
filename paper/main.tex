@@ -29,7 +29,7 @@
 \title{\avatt: A Free-Viewing Eye-Tracking Dataset and Benchmark for Visual Attention on Paintings}
 
 \author{Mohamed Amine Kerkouri\textsuperscript{1,}\thanks{Work done while at the University of Orl\'eans, PRISME
-Laboratory. This paper extends our ETRA 2024 late-breaking work~\cite{kerkouri2024avatt}.}\qquad Marouane Tliba\textsuperscript{2}\\
+Laboratory. This paper extends our ETRA 2024 late-breaking work~\cite{kerkouri2024avatt} and the first author's PhD thesis~\cite{kerkouri2024thesis}.}\qquad Marouane Tliba\textsuperscript{2}\\
 Aladine Chetouani\textsuperscript{2}\qquad Alessandro Bruno\textsuperscript{3}\\[4pt]
 \textsuperscript{1}F-Initiatives, France\qquad
 \textsuperscript{2}University of Orl\'eans, PRISME Laboratory, France\\
@@ -79,9 +79,9 @@ scenes~\cite{judd2009mit,jiang2015salicon,borji2015cat2000}. Paintings challenge
 Their textures, palettes and degrees of abstraction differ from photographs, they span centuries of pictorial
 conventions, and their content is \emph{composed}: artists place subjects, lines and contrasts deliberately to
 organise how a picture is read. Eye tracking has been used to study the viewing of art since Yarbus'
-recordings~\cite{yarbus1967,nodine1993art,quiroga2011art,massaro2012art}, but public data remain scarce. The
+recordings~\cite{yarbus1967,nodine1993art,quiroga2011art,massaro2012art,kerkouri2026divergent}, but public data remain scarce. The
 largest public collection provides aggregated saliency maps for 150 paintings in five styles, without individual
-scanpaths~\cite{lemeur2020paintings}. Two factors explain the gap: recording enough observers per image is costly, and
+scanpaths~\cite{lemeur2020paintings}, so scanpath models for paintings have had to rely on domain adaptation from photographs~\cite{kerkouri2022domain,tliba2022selfsupervised,kerkouri2026spgen}. Two factors explain the gap: recording enough observers per image is costly, and
 copyright restricts the redistribution of artworks.
 
 We present \avatt, a free-viewing eye-tracking dataset on paintings (\cref{fig:teaser}), first introduced as a
@@ -115,14 +115,27 @@ art use small purpose-built stimulus sets and do not release data~\cite{nodine19
 
 \mypara{Saliency models.} Bottom-up models compute centre--surround contrast~\cite{itti1998model}, graph-based
 activation~\cite{harel2006gbvs} or spectral residuals~\cite{hou2007spectral}. Deep models such as
-UNISAL~\cite{droste2020unisal}, TranSalNet~\cite{lou2022transalnet} and DeepGaze IIE~\cite{linardos2021deepgaze} lead
+UNISAL~\cite{droste2020unisal}, TranSalNet~\cite{lou2022transalnet}, SATSal~\cite{tliba2022satsal} and DeepGaze IIE~\cite{linardos2021deepgaze} lead
 on natural images. Maps are scored with location- and distribution-based metrics~\cite{bylinskii2019metrics}.
+
+\mypara{Scanpath prediction.} Scanpath models generate fixation sequences, from saccadic
+models~\cite{lemeur2015saccadic} to deep networks such as DeepGaze III~\cite{kummerer2022deepgaze3},
+SalyPath~\cite{kerkouri2021salypath,kerkouri2022salypath360} and lightweight or adversarially trained
+predictors~\cite{kerkouri2022simple,kerkouri2023adversarial}. On paintings, they are adapted from photographs with
+domain adaptation and self-supervision~\cite{kerkouri2022domain,tliba2022selfsupervised,kerkouri2026spgen}; \avatt{}
+provides the per-observer art data needed to train and evaluate them directly.
 
 \mypara{Scanpath similarity.} Scanpaths are compared with string-edit methods (ScanMatch~\cite{cristino2010scanmatch}),
 geometric distances (DTW, Fr\'echet, Hausdorff, Mannan~\cite{mannan1995}), the five-dimensional
 MultiMatch~\cite{dewhurst2012multimatch}, and FDISS~\cite{kerkouri2026fdiss}, which models fixations as foveal discs;
-see~\cite{lemeur2013methods} for a review. Language-model-based metrics~\cite{scanpathnlp} describe fixated regions with
+see~\cite{lemeur2013methods} for a review. Language-model-based metrics~\cite{kerkouri2026whatsaw,scanpathnlp} describe fixated regions with
 a vision--language model and compare the descriptions with text metrics such as BERTScore~\cite{zhang2020bertscore}.
+
+\mypara{Gaze as a probe.} Human gaze is also used to probe how vision models perceive, for masked
+autoencoders~\cite{tliba2024mae}, quantised networks~\cite{kerkouri2024quantization} and foveated multimodal
+LLMs~\cite{kerkouri2026foveated}, to guide segmentation~\cite{benyahia2026gazerefine}, and to characterise
+observers~\cite{bruno2023cvd,wong2025shifts,kerkouri2026divergent}. Our image-encoder scanpath metrics follow this line
+by reading gaze through the features of modern vision encoders.
 
 \mypara{Composition.} Compositional devices such as the rule of thirds, golden sections and spirals, diagonals, and
 Hambidge's dynamic symmetry~\cite{hambidge1926} are meant to organise attention. Photographic composition can be
@@ -314,7 +327,7 @@ correction~\cite{benjamini1995fdr}.
 implementations of MultiMatch, DTW, discrete Fr\'echet, Hausdorff, Euclidean, Mannan, EyeAnalysis, time-delay embedding
 and ScanMatch.
 
-\mypara{Image-encoder measures.} Language-model-based metrics~\cite{scanpathnlp} describe each fixated 96-px patch with
+\mypara{Image-encoder measures.} Language-model-based metrics~\cite{kerkouri2026whatsaw,scanpathnlp} describe each fixated 96-px patch with
 a vision--language model and compare paragraph descriptions with text metrics, at the cost of thousands of generative
 calls per painting. We keep the idea of comparing \emph{what} was fixated, but replace the text with image embeddings.
 Each painting is encoded once. A fixation is the mean of the dense feature map over its 96-px window ($\approx$2.7\dg),
@@ -503,7 +516,7 @@ style.
 paintings from sixteen movements, together with benchmarks for saliency and scanpath models and an analysis of what
 guides attention in art. Paintings leave clear headroom for saliency models; FDISS and our language-free encoder
 metrics capture shared viewing best; and faces, local structure, composed salient content and style shape where and
-how people look. Future work includes viewers with art expertise~\cite{nodine1993art}, higher-frequency recordings for
+how people look. Future work includes viewers with art expertise and diverse viewer populations~\cite{nodine1993art,kerkouri2026divergent}, higher-frequency recordings for
 saccade dynamics, and art-aware saliency, scanpath and composition models trained on \avatt. Data, code and the
 \texttt{avatt} package are available at \url{https://huggingface.co/datasets/Amine-CV/AVAtt} and
 \url{https://github.com/kmamine/AVAtt---Art-Visual-Attention}.
