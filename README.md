@@ -5,6 +5,7 @@
 **A free-viewing eye-tracking dataset and benchmark for visual attention on paintings**
 
 [![Dataset on HF](https://img.shields.io/badge/🤗%20Dataset-Amine--CV%2FAVAtt-yellow)](https://huggingface.co/datasets/Amine-CV/AVAtt)
+[![arXiv](https://img.shields.io/badge/arXiv-2610.30481-b31b1b.svg)](https://arxiv.org/abs/2610.30481)
 [![ETRA 2024](https://img.shields.io/badge/ETRA%202024-10.1145%2F3649902.3655656-blue)](https://doi.org/10.1145/3649902.3655656)
 [![Code: MIT](https://img.shields.io/badge/code-MIT-green.svg)](LICENSE)
 [![Data: CC0](https://img.shields.io/badge/data-CC0%201.0-lightgrey.svg)](https://creativecommons.org/publicdomain/zero/1.0/)
@@ -205,7 +206,16 @@ tests/          pytest suite (synthetic data; set AVATT_DATA to also test a loca
 
 ## Citation
 
+If you use AVAtt, please cite the [paper](https://arxiv.org/abs/2610.30481) and the original ETRA 2024 dataset paper:
+
 ```bibtex
+@article{kerkouri2026avatt,
+  title   = {{AVAtt}: A Free-Viewing Eye-Tracking Dataset and Benchmark for Visual Attention on Paintings},
+  author  = {Kerkouri, Mohamed Amine and Tliba, Marouane and Chetouani, Aladine and Bruno, Alessandro},
+  journal = {arXiv preprint arXiv:2610.30481},
+  year    = {2026}
+}
+
 @inproceedings{kerkouri2024avatt,
   title     = {{AVAtt}: Art Visual Attention dataset for diverse painting styles},
   author    = {Kerkouri, Mohamed Amine and Tliba, Marouane and Chetouani, Aladine and Bruno, Alessandro},
